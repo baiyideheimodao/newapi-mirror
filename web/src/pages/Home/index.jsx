@@ -45,7 +45,7 @@ import {
   OpenAI,
   XAI,
   Zhipu,
-  Volcengine,
+  ByteDance,
   Cohere,
   Claude,
   Gemini,
@@ -58,12 +58,20 @@ import {
   Qwen,
   Midjourney,
   Grok,
-  AzureAI,
+  Azure,
   Hunyuan,
-  Xinference,
 } from '@lobehub/icons';
+import { Server } from 'lucide-react';
 
 const { Text } = Typography;
+
+const Xinference = {
+  Color: ({ size = 40, color = 'currentColor', ...props }) => (
+    <Server size={size} color={color} {...props} />
+  ),
+};
+const Volcengine = ByteDance;
+const AzureAI = Azure;
 
 const Home = () => {
   const { t, i18n } = useTranslation();

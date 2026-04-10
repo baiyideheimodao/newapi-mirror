@@ -22,7 +22,6 @@ import { Modal, Tag, Typography, Avatar } from '@douyinfe/semi-ui';
 import { copy, showSuccess } from './utils';
 import { MOBILE_BREAKPOINT } from '../hooks/common/useIsMobile';
 import { visit } from 'unist-util-visit';
-import * as LobeIcons from '@lobehub/icons';
 import {
   OpenAI,
   Claude,
@@ -40,20 +39,16 @@ import {
   Cloudflare,
   Ai360,
   Yi,
-  Jina,
   Mistral,
   XAI,
   Ollama,
   Doubao,
   Suno,
-  Xinference,
   OpenRouter,
   Dify,
   Coze,
   SiliconCloud,
-  FastGPT,
   Kling,
-  Jimeng,
   Perplexity,
   Replicate,
 } from '@lobehub/icons';
@@ -75,6 +70,8 @@ import {
   Package,
   Server,
   CalendarClock,
+  Bot,
+  BrainCircuit,
 } from 'lucide-react';
 import {
   SiAtlassian,
@@ -89,7 +86,6 @@ import {
   SiGitlab,
   SiGoogle,
   SiKeycloak,
-  SiLinkedin,
   SiNextcloud,
   SiNotion,
   SiOkta,
@@ -101,6 +97,58 @@ import {
   SiWechat,
   SiX,
 } from 'react-icons/si';
+
+const lobeIconRegistry = {
+  OpenAI,
+  Claude,
+  Gemini,
+  Moonshot,
+  Zhipu,
+  Qwen,
+  DeepSeek,
+  Minimax,
+  Wenxin,
+  Spark,
+  Midjourney,
+  Hunyuan,
+  Cohere,
+  Cloudflare,
+  Ai360,
+  Yi,
+  Mistral,
+  XAI,
+  Ollama,
+  Doubao,
+  Suno,
+  OpenRouter,
+  Dify,
+  Coze,
+  SiliconCloud,
+  Kling,
+  Perplexity,
+  Replicate,
+};
+
+const createFallbackLobeIcon = (IconComponent) => {
+  const FallbackIcon = ({ size = 14, color = 'currentColor', ...props }) => (
+    <IconComponent size={size} color={color} {...props} />
+  );
+  FallbackIcon.Color = FallbackIcon;
+  FallbackIcon.Avatar = FallbackIcon;
+  return FallbackIcon;
+};
+
+const Jina = createFallbackLobeIcon(BrainCircuit);
+const Xinference = createFallbackLobeIcon(Server);
+const FastGPT = createFallbackLobeIcon(Bot);
+const Jimeng = createFallbackLobeIcon(Kling);
+
+Object.assign(lobeIconRegistry, {
+  Jina,
+  Xinference,
+  FastGPT,
+  Jimeng,
+});
 
 // 获取侧边栏Lucide图标组件
 export function getLucideIcon(key, selected = false) {
@@ -430,7 +478,7 @@ export function getLobeHubIcon(iconName, size = 14) {
   // 解析组件路径与点号链式属性
   const segments = String(iconName).split('.');
   const baseKey = segments[0];
-  const BaseIcon = LobeIcons[baseKey];
+  const BaseIcon = lobeIconRegistry[baseKey];
 
   let IconComponent = undefined;
   let propStartIndex = 1;
@@ -439,7 +487,7 @@ export function getLobeHubIcon(iconName, size = 14) {
     IconComponent = BaseIcon[segments[1]];
     propStartIndex = 2;
   } else {
-    IconComponent = LobeIcons[baseKey];
+    IconComponent = lobeIconRegistry[baseKey];
     propStartIndex = 1;
   }
 
@@ -504,7 +552,7 @@ const oauthProviderIconMap = {
   google: SiGoogle,
   discord: SiDiscord,
   facebook: SiFacebook,
-  linkedin: SiLinkedin,
+  linkedin: SiOpenid,
   x: SiX,
   twitter: SiX,
   slack: SiSlack,

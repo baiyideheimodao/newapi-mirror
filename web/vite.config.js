@@ -29,6 +29,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@lobehub/ui': path.resolve(__dirname, './src/shims/lobehub-ui.js'),
     },
   },
   plugins: [

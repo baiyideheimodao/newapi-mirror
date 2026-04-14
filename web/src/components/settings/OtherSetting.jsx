@@ -45,6 +45,7 @@ const OtherSetting = () => {
     [LEGAL_PRIVACY_POLICY_KEY]: '',
     SystemName: '',
     Logo: '',
+    ExternalSiteLogo: '',
     Footer: '',
     About: '',
     HomePageContent: '',
@@ -78,6 +79,7 @@ const OtherSetting = () => {
     [LEGAL_PRIVACY_POLICY_KEY]: false,
     SystemName: false,
     Logo: false,
+    ExternalSiteLogo: false,
     HomePageContent: false,
     About: false,
     Footer: false,
@@ -180,6 +182,20 @@ const OtherSetting = () => {
       showError('Logo 更新失败');
     } finally {
       setLoadingInput((loadingInput) => ({ ...loadingInput, Logo: false }));
+    }
+  };
+
+  // 个性化设置 - 外部网站Logo
+  const submitExternalSiteLogo = async () => {
+    try {
+      setLoadingInput((loadingInput) => ({ ...loadingInput, ExternalSiteLogo: true }));
+      await updateOption('ExternalSiteLogo', inputs.ExternalSiteLogo);
+      showSuccess(t('外部网站Logo已更新'));
+    } catch (error) {
+      console.error(t('外部网站Logo更新失败'), error);
+      showError(t('外部网站Logo更新失败'));
+    } finally {
+      setLoadingInput((loadingInput) => ({ ...loadingInput, ExternalSiteLogo: false }));
     }
   };
   // 个性化设置 - 首页内容
@@ -443,6 +459,15 @@ const OtherSetting = () => {
               />
               <Button onClick={submitLogo} loading={loadingInput['Logo']}>
                 {t('设置 Logo')}
+              </Button>
+              <Form.Input
+                label={t('外部网站Logo地址')}
+                placeholder={t('在此输入外部网站的Logo图片地址')}
+                field={'ExternalSiteLogo'}
+                onChange={handleInputChange}
+              />
+              <Button onClick={submitExternalSiteLogo} loading={loadingInput['ExternalSiteLogo']}>
+                {t('设置外部网站Logo')}
               </Button>
               <Form.TextArea
                 label={t('首页内容')}

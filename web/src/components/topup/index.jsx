@@ -123,6 +123,19 @@ const TopUp = () => {
         key: redemptionCode,
       });
       const { success, message, data } = res.data;
+      const rewardType = data?.reward_type || 'quota';
+      if (success && rewardType === 'subscription') {
+        showSuccess(message || t('兑换成功！'));
+        Modal.success({
+          title: message || t('兑换成功！'),
+          content: data?.plan_title
+            ? `${t('成功绑定订阅套餐：')}${data.plan_title}`
+            : t('成功绑定订阅套餐'),
+          centered: true,
+        });
+        setRedemptionCode('');
+        return;
+      }
       if (success) {
         showSuccess(t('兑换成功！'));
         Modal.success({

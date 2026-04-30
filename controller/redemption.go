@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"unicode/utf8"
@@ -77,6 +78,10 @@ func AddRedemption(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgRedemptionCountMax)
 		return
 	}
+	if err := validateRedemptionReward(c, &redemption); err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	if valid, msg := validateExpiredTime(c, redemption.ExpiredTime); !valid {
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": msg})
 		return
@@ -90,6 +95,8 @@ func AddRedemption(c *gin.Context) {
 			Key:         key,
 			CreatedTime: common.GetTimestamp(),
 			Quota:       redemption.Quota,
+			RewardType:  redemption.RewardType,
+			PlanId:      redemption.PlanId,
 			ExpiredTime: redemption.ExpiredTime,
 		}
 		err = cleanRedemption.Insert()
@@ -140,6 +147,10 @@ func UpdateRedemption(c *gin.Context) {
 		return
 	}
 	if statusOnly == "" {
+		if err := validateRedemptionReward(c, &redemption); err != nil {
+			common.ApiError(c, err)
+			return
+		}
 		if valid, msg := validateExpiredTime(c, redemption.ExpiredTime); !valid {
 			c.JSON(http.StatusOK, gin.H{"success": false, "message": msg})
 			return
@@ -147,6 +158,8 @@ func UpdateRedemption(c *gin.Context) {
 		// If you add more fields, please also update redemption.Update()
 		cleanRedemption.Name = redemption.Name
 		cleanRedemption.Quota = redemption.Quota
+		cleanRedemption.RewardType = redemption.RewardType
+		cleanRedemption.PlanId = redemption.PlanId
 		cleanRedemption.ExpiredTime = redemption.ExpiredTime
 	}
 	if statusOnly != "" {
@@ -184,4 +197,27 @@ func validateExpiredTime(c *gin.Context, expired int64) (bool, string) {
 		return false, i18n.T(c, i18n.MsgRedemptionExpireTimeInvalid)
 	}
 	return true, ""
+}
+
+func validateRedemptionReward(c *gin.Context, redemption *model.Redemption) error {
+	if redemption == nil {
+		return errors.New("invalid redemption")
+	}
+	redemption.RewardType = model.NormalizeRedemptionRewardType(redemption.RewardType)
+	switch redemption.RewardType {
+	case model.RedemptionRewardTypeSubscription:
+		if redemption.PlanId <= 0 {
+			return errors.New("请选择订阅套餐")
+		}
+		if _, err := model.GetSubscriptionPlanById(redemption.PlanId); err != nil {
+			return errors.New("所选订阅套餐不存在")
+		}
+		redemption.Quota = 0
+	default:
+		if redemption.Quota <= 0 {
+			return errors.New("兑换额度必须大于 0")
+		}
+		redemption.PlanId = 0
+	}
+	return nil
 }

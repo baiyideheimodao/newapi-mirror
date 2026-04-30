@@ -51,7 +51,8 @@ const Website = () => {
         return;
       }
 
-      const logoOption = data.find((item) => item.key === 'logo');
+      const optionList = Array.isArray(data) ? data : [];
+      const logoOption = optionList.find((item) => item.key === 'logo');
       const value = logoOption?.value || '';
       setLogoValue(value);
       setSavedLogoValue(value);
@@ -133,20 +134,7 @@ const Website = () => {
             >
               <div>
                 <Title heading={5}>{t('网站管理')}</Title>
-                <Text type='secondary'>
-                  {t(
-                    '这里只维护 options 表中的 logo 配置，key 为 logo，value 为 base64。',
-                  )}
-                </Text>
               </div>
-
-              <Banner
-                type='info'
-                closeIcon={null}
-                description={t(
-                  '该页面不会修改当前网站实际显示中的 Logo，只会保存一份数据库配置，供后续功能使用。',
-                )}
-              />
 
               <div className='flex flex-wrap gap-2'>
                 <input
@@ -218,7 +206,7 @@ const Website = () => {
               </div>
             ) : (
               <Empty
-                image={<Empty.PRESENTED_IMAGE_SIMPLE />}
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
                 title={t('暂无 Logo 配置')}
                 description={t(
                   '上传图片后保存，即可把 base64 写入 options 表中的 logo。',

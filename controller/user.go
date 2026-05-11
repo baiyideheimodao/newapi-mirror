@@ -97,6 +97,19 @@ func setupLogin(user *model.User, c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserSessionSaveFailed)
 		return
 	}
+
+	// 异步关联到 Claude 数据库
+	go func() {
+		if model.CLAUDE_DB != nil {
+			_, err := service.LinkNewapiUserToClaude(user.Id)
+			if err != nil {
+				common.SysLog(fmt.Sprintf("Failed to link user to Claude: %v", err))
+			} else {
+				common.SysLog(fmt.Sprintf("User %s linked to Claude successfully", user.Username))
+			}
+		}
+	}()
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "",
 		"success": true,

@@ -65,6 +65,9 @@ var DB *gorm.DB
 
 var LOG_DB *gorm.DB
 
+// CLAUDE_DB 用于连接 claude 数据库（Claude前端的数据库）
+var CLAUDE_DB *gorm.DB
+
 func createRootAccountIfNeed() error {
 	var user User
 	//if user.Status != common.UserStatusEnabled {
@@ -245,6 +248,204 @@ func InitLogDB() (err error) {
 		common.FatalLog(err)
 	}
 	return err
+}
+
+// InitClaudeDB 初始化 Claude 数据库连接
+// CLAUDE_SQL_DSN 用于连接 Claude 前端的数据库，实现用户表打通
+func InitClaudeDB() (err error) {
+	dsn := os.Getenv("CLAUDE_SQL_DSN")
+	if dsn == "" {
+		common.SysLog("CLAUDE_SQL_DSN not set, Claude database connection disabled")
+		return nil
+	}
+
+	db, err := chooseDB("CLAUDE_SQL_DSN", false)
+	if err == nil {
+		if common.DebugEnabled {
+			db = db.Debug()
+		}
+		CLAUDE_DB = db
+		common.SysLog("Claude database connected successfully")
+
+		// MySQL charset/collation startup check
+		if common.UsingMySQL {
+			if err := checkMySQLChineseSupport(CLAUDE_DB); err != nil {
+				common.SysLog("Warning: Claude database Chinese support check failed: " + err.Error())
+			}
+		}
+
+		sqlDB, err := CLAUDE_DB.DB()
+		if err != nil {
+			return err
+		}
+		sqlDB.SetMaxIdleConns(common.GetEnvOrDefault("SQL_MAX_IDLE_CONNS", 10))
+		sqlDB.SetMaxOpenConns(common.GetEnvOrDefault("SQL_MAX_OPEN_CONNS", 50))
+		sqlDB.SetConnMaxLifetime(time.Second * time.Duration(common.GetEnvOrDefault("SQL_MAX_LIFETIME", 60)))
+
+		// 执行 claude 数据库迁移，添加 newapi_user_id 字段
+		if err := migrateClaudeDB(); err != nil {
+			common.SysLog("Warning: Claude database migration failed: " + err.Error())
+		}
+		return nil
+	} else {
+		common.SysLog("Warning: Failed to connect to Claude database: " + err.Error())
+		return nil // 不阻塞主程序
+	}
+}
+
+// migrateClaudeDB 为 Claude 数据库添加与 newapi 打通的字段
+func migrateClaudeDB() error {
+	if CLAUDE_DB == nil {
+		return fmt.Errorf("Claude database not initialized")
+	}
+
+	// 检查 users 表是否存在
+	if !CLAUDE_DB.Migrator().HasTable("users") {
+		common.SysLog("Claude database users table not found, skipping migration")
+		return nil
+	}
+
+	// 添加 newapi_user_id 字段（关联到 claude_admin 的 users 表）
+	// 使用 MySQL 的 ALTER TABLE 语句直接添加，因为 GORM 的 AutoMigrate 可能不完美处理这种情况
+	if common.UsingMySQL {
+		// 检查字段是否已存在
+		var count int
+		err := CLAUDE_DB.Raw(`
+			SELECT COUNT(*) FROM information_schema.columns 
+			WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'newapi_user_id'
+		`).Scan(&count).Error
+		if err != nil {
+			return err
+		}
+		if count == 0 {
+			// 添加字段
+			err = CLAUDE_DB.Exec("ALTER TABLE users ADD COLUMN newapi_user_id bigint NULL DEFAULT NULL").Error
+			if err != nil {
+				common.SysLog("Warning: Failed to add newapi_user_id column: " + err.Error())
+			} else {
+				common.SysLog("Successfully added newapi_user_id column to claude.users table")
+			}
+			// 添加索引
+			err = CLAUDE_DB.Exec("ALTER TABLE users ADD INDEX idx_newapi_user_id (newapi_user_id)").Error
+			if err != nil {
+				// 索引可能已存在，忽略错误
+				common.SysLog("Index creation skipped: " + err.Error())
+			}
+		}
+
+		// 添加 linked_at 字段记录绑定时间
+		err = CLAUDE_DB.Raw(`
+			SELECT COUNT(*) FROM information_schema.columns 
+			WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'linked_at'
+		`).Scan(&count).Error
+		if err != nil {
+			return err
+		}
+		if count == 0 {
+			err = CLAUDE_DB.Exec("ALTER TABLE users ADD COLUMN linked_at datetime NULL DEFAULT NULL").Error
+			if err != nil {
+				common.SysLog("Warning: Failed to add linked_at column: " + err.Error())
+			} else {
+				common.SysLog("Successfully added linked_at column to claude.users table")
+			}
+		}
+	} else if common.UsingSQLite {
+		// SQLite 不支持直接添加带索引的字段，需要分步执行
+		// 检查并添加 newapi_user_id
+		 CLAUDE_DB.Exec("ALTER TABLE users ADD COLUMN newapi_user_id INTEGER NULL DEFAULT NULL")
+		common.SysLog("SQLite: Added newapi_user_id column (index creation skipped)")
+	}
+
+	// 创建用户关联辅助表（用于更灵活的关联关系）
+	if !CLAUDE_DB.Migrator().HasTable("newapi_user_links") {
+		err := CLAUDE_DB.Exec(`
+			CREATE TABLE IF NOT EXISTS newapi_user_links (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				claude_user_id VARCHAR(36) NOT NULL,
+				newapi_user_id BIGINT NOT NULL,
+				link_type VARCHAR(20) NOT NULL DEFAULT 'primary',
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE INDEX idx_link_claude (claude_user_id),
+				UNIQUE INDEX idx_link_newapi (newapi_user_id)
+			)
+		`).Error
+		if err != nil {
+			common.SysLog("Warning: Failed to create newapi_user_links table: " + err.Error())
+		} else {
+			common.SysLog("Successfully created newapi_user_links table")
+		}
+	}
+
+	return nil
+}
+
+// GetClaudeUserByNewapiUserId 根据 newapi 的 user_id 获取 claude 数据库中的用户
+func GetClaudeUserByNewapiUserId(newapiUserId int) (*ClaudeDBUser, error) {
+	if CLAUDE_DB == nil {
+		return nil, fmt.Errorf("Claude database not initialized")
+	}
+	var user ClaudeDBUser
+	err := CLAUDE_DB.Where("newapi_user_id = ?", newapiUserId).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+// GetNewapiUserIdByClaudeUserId 根据 claude 数据库的用户ID获取 newapi 的 user_id
+func GetNewapiUserIdByClaudeUserId(claudeUserId string) (int, error) {
+	if CLAUDE_DB == nil {
+		return 0, fmt.Errorf("Claude database not initialized")
+	}
+	var user ClaudeDBUser
+	err := CLAUDE_DB.Where("id = ?", claudeUserId).First(&user).Error
+	if err != nil {
+		return 0, err
+	}
+	return int(user.NewapiUserID), nil
+}
+
+// LinkUserToClaude 将 newapi 用户关联到 claude 用户
+func LinkUserToClaude(newapiUserId int, claudeUserId string) error {
+	if CLAUDE_DB == nil {
+		return fmt.Errorf("Claude database not initialized")
+	}
+
+	// 更新 users 表的 newapi_user_id 字段
+	err := CLAUDE_DB.Model(&ClaudeDBUser{}).Where("id = ?", claudeUserId).Updates(map[string]interface{}{
+		"newapi_user_id": newapiUserId,
+		"linked_at":      time.Now(),
+	}).Error
+	if err != nil {
+		return err
+	}
+
+	// 同时在关联表中记录
+	return CLAUDE_DB.Exec(`
+		INSERT OR REPLACE INTO newapi_user_links (claude_user_id, newapi_user_id, link_type, created_at)
+		VALUES (?, ?, 'primary', ?)
+	`, claudeUserId, newapiUserId, time.Now()).Error
+}
+
+// ClaudeDBUser claude 数据库中的用户结构（用于跨数据库查询）
+type ClaudeDBUser struct {
+	ID            string    `gorm:"column:id;primaryKey" json:"id"`
+	Username      string    `gorm:"column:username" json:"username"`
+	Email         string    `gorm:"column:email" json:"email"`
+	PasswordHash  string    `gorm:"column:password_hash" json:"-"`
+	Avatar        *string   `gorm:"column:avatar" json:"avatar"`
+	CreatedAt     time.Time `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt     time.Time `gorm:"column:updated_at" json:"updated_at"`
+	LastLogin     *time.Time `gorm:"column:last_login" json:"last_login"`
+	IsActive      bool      `gorm:"column:is_active" json:"is_active"`
+	EmailVerified bool      `gorm:"column:email_verified" json:"email_verified"`
+	// 关联字段
+	NewapiUserID int        `gorm:"column:newapi_user_id" json:"newapi_user_id"`
+	LinkedAt     *time.Time `gorm:"column:linked_at" json:"linked_at"`
+}
+
+func (ClaudeDBUser) TableName() string {
+	return "users"
 }
 
 func migrateDB() error {
@@ -574,6 +775,12 @@ func closeDB(db *gorm.DB) error {
 func CloseDB() error {
 	if LOG_DB != DB {
 		err := closeDB(LOG_DB)
+		if err != nil {
+			return err
+		}
+	}
+	if CLAUDE_DB != nil {
+		err := closeDB(CLAUDE_DB)
 		if err != nil {
 			return err
 		}

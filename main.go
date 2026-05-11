@@ -285,6 +285,13 @@ func InitResources() error {
 		return err
 	}
 
+	// Initialize Claude Database (Claude前端数据库连接，用于用户表打通)
+	err = model.InitClaudeDB()
+	if err != nil {
+		common.SysLog("Warning: failed to initialize Claude database: " + err.Error())
+		// 不阻塞主程序，继续运行
+	}
+
 	// Initialize Redis
 	err = common.InitRedisClient()
 	if err != nil {

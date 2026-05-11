@@ -982,6 +982,97 @@ html.dark .with-pastel-balls::before {
   border-radius: 10px !important;
 }
 
+/* ==================== Semi UI 按钮边框修复 ==================== */
+/* 使用 @layer 提升样式优先级，覆盖 Semi UI 默认样式 */
+
+@layer semi-button-override {
+  /* 基础按钮边框 - 使用最高特异性 */
+  :is(button)[class*="semi"]:not([style*="none"]):not([style*="0"]),
+  :is(button)[class*="Semi"],
+  :is(button)[class*="btn"]:not([class*="icon"]),
+  button[class*="semi-button"],
+  button[class*="semi-btn"] {
+    border: 1px solid !important;
+    border-style: solid !important;
+    border-color: var(--semi-color-border, #e3e3e3) !important;
+    border-width: 1px !important;
+  }
+
+  /* 主要按钮 */
+  :is(button)[class*="semi"][class*="primary"],
+  :is(button)[class*="Semi"][class*="Primary"],
+  :is(button)[class*="semi-btn-primary"],
+  :is(button)[class*="semi-button-primary"] {
+    border-color: var(--semi-color-primary, #4f7df3) !important;
+  }
+
+  :is(button)[class*="semi"][class*="primary"]:hover,
+  :is(button)[class*="Semi"][class*="Primary"]:hover {
+    border-color: var(--semi-color-primary-hover, #3b6ce7) !important;
+    box-shadow: 0 2px 8px rgba(79, 125, 243, 0.25) !important;
+  }
+
+  /* 危险按钮 */
+  :is(button)[class*="semi"][class*="danger"],
+  :is(button)[class*="Semi"][class*="Danger"],
+  :is(button)[class*="semi-btn-danger"],
+  :is(button)[class*="semi-button-danger"] {
+    border-color: var(--semi-color-danger, #f44336) !important;
+  }
+
+  :is(button)[class*="semi"][class*="danger"]:hover,
+  :is(button)[class*="Semi"][class*="Danger"]:hover {
+    border-color: var(--semi-color-danger-hover, #e53935) !important;
+    box-shadow: 0 2px 8px rgba(244, 67, 54, 0.25) !important;
+  }
+
+  /* 次要按钮 */
+  :is(button)[class*="semi"][class*="secondary"],
+  :is(button)[class*="Semi"][class*="Secondary"] {
+    border-color: var(--semi-color-secondary, #6b7280) !important;
+  }
+
+  /* 幽灵按钮（tertiary）- 透明背景配边框 */
+  :is(button)[class*="semi"][class*="tertiary"],
+  :is(button)[class*="Semi"][class*="Tertiary"],
+  :is(button)[class*="semi-btn-tertiary"],
+  :is(button)[class*="semi-button-tertiary"] {
+    background-color: transparent !important;
+    border-color: var(--semi-color-border, #e3e3e3) !important;
+    color: var(--semi-color-text-0, #1f1f1f) !important;
+  }
+
+  :is(button)[class*="semi"][class*="tertiary"]:hover,
+  :is(button)[class*="Semi"][class*="Tertiary"]:hover {
+    background-color: var(--semi-color-fill-0, #f5f5f5) !important;
+    border-color: var(--semi-color-default-hover, #c5c5c5) !important;
+    color: var(--semi-color-text-0, #1f1f1f) !important;
+  }
+
+  /* 警告按钮 */
+  :is(button)[class*="semi"][class*="warning"],
+  :is(button)[class*="Semi"][class*="Warning"] {
+    border-color: var(--semi-color-warning, #f59e0b) !important;
+  }
+
+  /* 默认按钮悬停 */
+  :is(button)[class*="semi"]:not([class*="primary"]):not([class*="danger"]):not([class*="tertiary"]):not([class*="secondary"]):hover {
+    border-color: var(--semi-color-default-hover, #c5c5c5) !important;
+  }
+
+  /* 聚焦状态 */
+  :is(button)[class*="semi"]:focus-visible {
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(79, 125, 243, 0.15) !important;
+  }
+
+  /* 禁用状态 */
+  :is(button)[class*="semi"][disabled],
+  :is(button)[class*="semi"].disabled {
+    opacity: 0.5 !important;
+  }
+}
+
 @keyframes slideInLeft {
   from {
     transform: translateX(-100%);
